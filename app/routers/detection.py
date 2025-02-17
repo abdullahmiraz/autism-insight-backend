@@ -12,23 +12,23 @@ predictor = AutismPredictor("app/ml_model/logistic_regression_model.pkl")
 async def predict_autism(request: AutismPredictionRequest):
     try:
         data = [
-            request.A1,
-            request.A2,
-            request.A3,
-            request.A4,
-            request.A5,
-            request.A6,
-            request.A7,
-            request.A8,
-            request.A9,
-            request.A10,
-            request.age_mons,  # Age in months
-            request.qchat_10_score,  # Qchat-10 Score
-            request.sex,  # Sex
-            request.ethnicity,  # Ethnicity
-            request.jaundice,  # Jaundice history
-            request.family_mem_with_asd,  # Family member with ASD
-            request.who_completed_test,  # Who completed the test
+            int(request.A1),  # Ensure these are integers
+            int(request.A2),
+            int(request.A3),
+            int(request.A4),
+            int(request.A5),
+            int(request.A6),
+            int(request.A7),
+            int(request.A8),
+            int(request.A9),
+            int(request.A10),
+            int(request.Age_Mons),  # Convert Age_Mons to int if needed
+            int(request.Qchat_10_Score),  # Ensure it's an integer
+            str(request.Sex),  # Sex can remain a string
+            str(request.Ethnicity),  # Ethnicity should be a string
+            str(request.Jaundice),  # Jaundice should be a string
+            str(request.Family_mem_with_ASD),  # Same for Family_mem_with_ASD
+            str(request.Who_completed_test),  # Same for Who_completed_test
         ]
         prediction, confidence = predictor.predict(data)
         return {"prediction": prediction, "confidence": confidence}

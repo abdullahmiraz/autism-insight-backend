@@ -1,12 +1,15 @@
 from fastapi import FastAPI
-from app.routers import detection, progress, therapy
+
+# from app.routers import detection, progress, therapy
+from app.routers import detection
 
 app = FastAPI()
 
 # Include routers
-app.include_router(detection.router,   tags=["Detection"])
-app.include_router(progress.router,   tags=["Progress"])
-app.include_router(therapy.router,   tags=["Therapy"])
+app.include_router(detection.router, tags=["Detection"])
+# app.include_router(progress.router,   tags=["Progress"])
+# app.include_router(therapy.router,   tags=["Therapy"])
+
 
 @app.get("/")
 def read_root():
