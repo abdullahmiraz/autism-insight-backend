@@ -1,56 +1,66 @@
-from fastapi import APIRouter, HTTPException
+# app/routes/detection.py
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.autism_predictor import AutismPredictor
 from app.schemas import AutismPredictionRequest, AutismPredictionResponse
+from config import MODEL_PATHS
+import shutil
+import os
 
 router = APIRouter()
 
-# Load the model
-predictor = AutismPredictor("app/ml_model/logistic_regression_model.pkl")
+# Ensure upload directories exist
+UPLOAD_DIR = "uploads"
+os.makedirs(f"{UPLOAD_DIR}/videos", exist_ok=True)
+os.makedirs(f"{UPLOAD_DIR}/images", exist_ok=True)
+
+# Load models using centralized config
+predictor = AutismPredictor(MODEL_PATHS["question_model"])
+photo_predictor = AutismPredictor(MODEL_PATHS["photo_model"])
+video_predictor = AutismPredictor(MODEL_PATHS["video_model"])
 
 
+# 1️⃣ Autism Detection from Questionnaire
 @router.post("/predict", response_model=AutismPredictionResponse)
 async def predict_autism(request: AutismPredictionRequest):
     try:
-        data = [
-            int(request.A1),  # Ensure these are integers
-            int(request.A2),
-            int(request.A3),
-            int(request.A4),
-            int(request.A5),
-            int(request.A6),
-            int(request.A7),
-            int(request.A8),
-            int(request.A9),
-            int(request.A10),
-            int(request.Age_Mons),  # Convert Age_Mons to int if needed
-                                  # Ensure it's an integer
-            int(request.Sex),  # Sex can remain a string
-            int(request.Ethnicity),  # Ethnicity should be a string
-            int(request.Jaundice),  # Jaundice should be a string
-            int(request.Family_mem_with_ASD),  # Same for Family_mem_with_ASD
-            # str(request.Who_completed_test),  # Same for Who_completed_test
-        ]
+        # Convert request data to list of integers
+        data = [getattr(request, field) for field in request.__fields__]
         prediction, confidence = predictor.predict(data)
         return {"prediction": prediction, "confidence": confidence}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 
-# import pickle
-# from fastapi import APIRouter
+# 2️⃣ Video Prediction
+@router.post("/predict-video", response_model=AutismPredictionResponse)
+async def predict_from_video(video: UploadFile = File(...)):
+    try:
+        video_path = f"{UPLOAD_DIR}/videos/{video.filename}"
+        with open(video_path, "wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
 
-# # Load the ML model
-# with open("app/ml_model/autism_model.pkl", "rb") as f:
-#     model = pickle.load(f)
+        # Mock video prediction (replace with actual video analysis)
+        prediction, confidence = video_predictor.predict([1] * 10)
+        return {"prediction": prediction, "confidence": confidence}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process video: {str(e)}"
+        )
 
-# router = APIRouter()
 
-# @router.post("/predict")
-# async def predict_symptoms(data: dict):
-#     # Sample input data preprocessing (you'll adapt this)
-#     features = [data["feature_1"], data["feature_2"], data["feature_3"]]
+# 3️⃣ Image Prediction (Multiple)
+@router.post("/predict-images", response_model=AutismPredictionResponse)
+async def predict_from_images(images: list[UploadFile] = File(...)):
+    try:
+        for image in images:
+            image_path = f"{UPLOAD_DIR}/images/{image.filename}"
+            with open(image_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
 
-#     # Use the loaded model to make a prediction
-#     prediction = model.predict([features])
-
-#     return {"prediction": prediction.tolist()}
+        # Mock image prediction (replace with actual image analysis)
+        classes, [] = photo_predictor.predict([0, 1] * 5)
+        return {"prediction": classes, "confidence": []}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process images: {str(e)}"
+        )
