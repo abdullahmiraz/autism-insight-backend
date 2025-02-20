@@ -23,12 +23,12 @@ async def predict_autism(request: AutismPredictionRequest):
             int(request.A9),
             int(request.A10),
             int(request.Age_Mons),  # Convert Age_Mons to int if needed
-            int(request.Qchat_10_Score),  # Ensure it's an integer
-            str(request.Sex),  # Sex can remain a string
-            str(request.Ethnicity),  # Ethnicity should be a string
-            str(request.Jaundice),  # Jaundice should be a string
-            str(request.Family_mem_with_ASD),  # Same for Family_mem_with_ASD
-            str(request.Who_completed_test),  # Same for Who_completed_test
+                                  # Ensure it's an integer
+            int(request.Sex),  # Sex can remain a string
+            int(request.Ethnicity),  # Ethnicity should be a string
+            int(request.Jaundice),  # Jaundice should be a string
+            int(request.Family_mem_with_ASD),  # Same for Family_mem_with_ASD
+            # str(request.Who_completed_test),  # Same for Who_completed_test
         ]
         prediction, confidence = predictor.predict(data)
         return {"prediction": prediction, "confidence": confidence}

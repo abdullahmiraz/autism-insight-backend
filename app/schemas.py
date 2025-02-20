@@ -14,14 +14,13 @@ class AutismPredictionRequest(BaseModel):
     A9: int
     A10: int
     Age_Mons: int
-    Qchat_10_Score: int
-    Sex: str
-    Ethnicity: str
-    Jaundice: str
-    Family_mem_with_ASD: str
-    Who_completed_test: str
+    Sex: int
+    Ethnicity: int
+    Jaundice: int
+    Family_mem_with_ASD: int
+    
 
 
 class AutismPredictionResponse(BaseModel):
-    prediction: str
+    prediction: int
     confidence: float
