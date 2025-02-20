@@ -1,6 +1,6 @@
 # app/routes/detection.py
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.models.autism_predictor import AutismPredictor
+from app.models.autism_predictor import AutismPredictor, ImageAutismPredictor
 from app.schemas import AutismPredictionRequest, AutismPredictionResponse
 from config import MODEL_PATHS
 import shutil
@@ -15,7 +15,7 @@ os.makedirs(f"{UPLOAD_DIR}/images", exist_ok=True)
 
 # Load models using centralized config
 predictor = AutismPredictor(MODEL_PATHS["question_model"])
-photo_predictor = AutismPredictor(MODEL_PATHS["photo_model"])
+photo_predictor = ImageAutismPredictor(MODEL_PATHS["photo_model"])
 video_predictor = AutismPredictor(MODEL_PATHS["video_model"])
 
 
@@ -52,15 +52,36 @@ async def predict_from_video(video: UploadFile = File(...)):
 @router.post("/predict-images", response_model=AutismPredictionResponse)
 async def predict_from_images(images: list[UploadFile] = File(...)):
     try:
+        results = []
         for image in images:
             image_path = f"{UPLOAD_DIR}/images/{image.filename}"
             with open(image_path, "wb") as buffer:
                 shutil.copyfileobj(image.file, buffer)
 
-        # Mock image prediction (replace with actual image analysis)
-        classes, [] = photo_predictor.predict([0, 1] * 5)
-        return {"prediction": classes, "confidence": []}
+            # Predict from the image using the ImageAutismPredictor
+            label, confidence = photo_predictor.predict_image(image_path)
+            results.append({"label": label, "confidence": confidence})
+
+        return {"prediction": results}
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to process images: {str(e)}"
+            status_code=500, detail=f"Failed to process images: {(e)}"
         )
+
+
+# # 3️⃣ Image Prediction (Multiple)
+# @router.post("/predict-images", response_model=AutismPredictionResponse)
+# async def predict_from_images(images: list[UploadFile] = File(...)):
+#     try:
+#         for image in images:
+#             image_path = f"{UPLOAD_DIR}/images/{image.filename}"
+#             with open(image_path, "wb") as buffer:
+#                 shutil.copyfileobj(image.file, buffer)
+
+#         # Mock image prediction (replace with actual image analysis)
+#         classes, [] = photo_predictor.predict([0, 1] * 5)
+#         return {"prediction": classes, "confidence": []}
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500, detail=f"Failed to process images: {str(e)}"
+#         )
