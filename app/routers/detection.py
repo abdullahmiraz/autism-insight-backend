@@ -1,37 +1,31 @@
-# app/routes/detection.py
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.models.autism_predictor import AutismPredictor, ImageAutismPredictor
+# from app.models.autism_predictor import predict_image
+from app.models.autism_predictor import predict_image, predict_video
 from app.schemas import AutismPredictionRequest, AutismPredictionResponse
-from config import MODEL_PATHS
 import shutil
 import os
 
 router = APIRouter()
 
-# Ensure upload directories exist
 UPLOAD_DIR = "uploads"
 os.makedirs(f"{UPLOAD_DIR}/videos", exist_ok=True)
 os.makedirs(f"{UPLOAD_DIR}/images", exist_ok=True)
 
-# Load models using centralized config
-predictor = AutismPredictor(MODEL_PATHS["question_model"])
-photo_predictor = ImageAutismPredictor(MODEL_PATHS["photo_model"])
-video_predictor = AutismPredictor(MODEL_PATHS["video_model"])
 
+# ! Question Prediction ###########################
 
-# 1️⃣ Autism Detection from Questionnaire
 @router.post("/predict", response_model=AutismPredictionResponse)
 async def predict_autism(request: AutismPredictionRequest):
     try:
-        # Convert request data to list of integers
         data = [getattr(request, field) for field in request.__fields__]
-        prediction, confidence = predictor.predict(data)
+        prediction = int(sum(data) > len(data) / 2)
+        confidence = sum(data) / len(data)
         return {"prediction": prediction, "confidence": confidence}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+# !video prediction ###########################
 
-# 2️⃣ Video Prediction
 @router.post("/predict-video", response_model=AutismPredictionResponse)
 async def predict_from_video(video: UploadFile = File(...)):
     try:
@@ -39,49 +33,93 @@ async def predict_from_video(video: UploadFile = File(...)):
         with open(video_path, "wb") as buffer:
             shutil.copyfileobj(video.file, buffer)
 
-        # Mock video prediction (replace with actual video analysis)
-        prediction, confidence = video_predictor.predict([1] * 10)
-        return {"prediction": prediction, "confidence": confidence}
+        result = predict_video(video_path)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to process video: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# 3️⃣ Image Prediction (Multiple)
-@router.post("/predict-images", response_model=AutismPredictionResponse)
+ # ! image prediction ###########################
+
+@router.post("/predict-images", response_model=list[AutismPredictionResponse])
 async def predict_from_images(images: list[UploadFile] = File(...)):
     try:
-        results = []
+        if not images:
+            raise HTTPException(status_code=400, detail="No images uploaded for prediction.")
+
+        predictions = []
+
         for image in images:
             image_path = f"{UPLOAD_DIR}/images/{image.filename}"
             with open(image_path, "wb") as buffer:
                 shutil.copyfileobj(image.file, buffer)
 
-            # Predict from the image using the ImageAutismPredictor
-            label, confidence = photo_predictor.predict_image(image_path)
-            results.append({"label": label, "confidence": confidence})
+            result = predict_image(image_path)
 
-        return {"prediction": results}
+            if "error" in result:
+                continue  # Skip if there's an error with an image
+
+            # Append each result in the desired format
+            predictions.append(AutismPredictionResponse(
+                prediction=result.get("prediction", 0),
+                confidence=result.get("confidence", 0.0)
+            ))
+
+        if not predictions:
+            raise HTTPException(status_code=500, detail="Failed to predict any images.")
+
+        return predictions
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to process images: {(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# # 3️⃣ Image Prediction (Multiple)
-# @router.post("/predict-images", response_model=AutismPredictionResponse)
+# single image prediction working fine below this
+# @router.post("/predict-images", response_model=dict)
 # async def predict_from_images(images: list[UploadFile] = File(...)):
 #     try:
+#         if len(images) != 1:
+#             raise HTTPException(status_code=400, detail="Please upload exactly one image for prediction.")
+
+#         image = images[0]
+#         image_path = f"{UPLOAD_DIR}/images/{image.filename}"
+#         with open(image_path, "wb") as buffer:
+#             shutil.copyfileobj(image.file, buffer)
+
+#         result = predict_image(image_path)
+
+#         if "error" in result:
+#             raise HTTPException(status_code=500, detail=result["error"])
+
+#         # Return a dictionary matching the expected format
+#         return {
+#             "prediction": result.get("prediction", 0),
+#             "confidence": result.get("confidence", 0.0)
+#         }
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+# @router.post("/predict-images", response_model=dict)
+# async def predict_from_images(images: list[UploadFile] = File(...)):
+#     try:
+#         results = []
 #         for image in images:
 #             image_path = f"{UPLOAD_DIR}/images/{image.filename}"
 #             with open(image_path, "wb") as buffer:
 #                 shutil.copyfileobj(image.file, buffer)
 
-#         # Mock image prediction (replace with actual image analysis)
-#         classes, [] = photo_predictor.predict([0, 1] * 5)
-#         return {"prediction": classes, "confidence": []}
+#             result = predict_image(image_path)
+#             if "error" in result:
+#                 continue
+#             results.append(result)
+
+#         return {"predictions": results}
 #     except Exception as e:
-#         raise HTTPException(
-#             status_code=500, detail=f"Failed to process images: {str(e)}"
-#         )
+#         raise HTTPException(status_code=500, detail=str(e))

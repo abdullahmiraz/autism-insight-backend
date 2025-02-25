@@ -28,3 +28,8 @@ archive.zip
 
 # macOS
 .DS_Store
+
+*.h5
+*.zip
+
+uploads/*
