@@ -5,30 +5,52 @@ import os
 import h5py
 from collections import Counter  # For majority vote
 from PIL import Image
+from tensorflow.keras.applications import EfficientNetB7
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
 
 # Paths for models
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_MODEL_PATH = os.path.join(BASE_DIR, "../ml_model/autism_detection_model.h5")  # Trained model path
 
-def load_trained_model(model_path):
-    """Load the full model if possible, otherwise raise an error."""
-    try:
-        model = tf.keras.models.load_model(model_path)
-        print(f"✅ Successfully loaded full model from {model_path}")
-        return model
-    except Exception as e:
-        print(f"⚠️ Failed to load full model: {e}")
-        raise  # Re-raise the exception
-
-# Load the trained image model
-try:
-    image_model = load_trained_model(IMAGE_MODEL_PATH)
-except Exception as e:
-    print(f"❌ Failed to load image model. Aborting. Error: {e}")
-    exit()
-
 IMAGE_SIZE = (224, 224)  # Consistent image size
 NUM_FRAMES = 10  # Number of frames to extract from video
+
+def create_model(image_size):
+    """Creates the EfficientNetB7 model."""
+    base_model = EfficientNetB7(
+        include_top=False,
+        weights='imagenet',
+        input_shape=(image_size[0], image_size[1], 3)
+    )
+
+    # Freeze the base model layers
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    x = BatchNormalization()(x) # Add BatchNormalization
+    x = Dense(128, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    predictions = Dense(1, activation='sigmoid')(x)  # Binary classification
+
+    model = Model(inputs=base_model.input, outputs=predictions)
+    return model
+# Load the trained image model
+
+image_model = create_model(IMAGE_SIZE)
+
+# Load weights *only*
+try:
+    image_model.load_weights(IMAGE_MODEL_PATH)
+    print(f"✅ Successfully loaded model weights from {IMAGE_MODEL_PATH}")
+except Exception as e:
+    print(f"❌ Failed to load model weights. Error: {e}")
+    exit()
+
+print('Successfully loaded the model')
 
 def preprocess_image(image_path):
     """Preprocess an image for model prediction."""
